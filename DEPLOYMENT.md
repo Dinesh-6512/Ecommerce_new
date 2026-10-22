@@ -119,23 +119,34 @@ In the Render dashboard, click **New +** $\rightarrow$ **Web Service**:
 
 ---
 
-### Part 3: ReactJS Frontend (Render Static Site)
-In the Render dashboard, click **New +** $\rightarrow$ **Static Site**:
+### Part 3: Render Frontend Deployment (Render Static Site)
 
-| Setting | Value | Why It Is Used |
-| :--- | :--- | :--- |
-| **Name** | `ecommerce-frontend` | Name of your storefront website. |
-| **Root Directory** | `frontend` | Tells Render to run commands inside the `frontend/` folder. |
-| **Build Command** | `npm install && npm run build` | Downloads packages and bundles production static assets. |
-| **Publish Directory** | `dist` | The folder where Vite places the compiled HTML, CSS, and JS files. |
+Follow these exact steps to deploy the ReactJS frontend on Render and connect it to your live FastAPI backend:
 
-#### Crucial: Rewrite Rule for React Router (Single Page Application)
-Because React Router manages page navigation client-side, any direct visit to `/login`, `/cart`, or `/add-product` must return `index.html`:
-1. In your Render Static Site dashboard, go to the **Redirects / Rewrites** tab.
-2. Click **Add Rule**:
+#### RENDER FRONTEND STEPS:
+1. In Render, click **New +** at the top right and choose **Static Site**.
+2. Select the same GitHub repository (`Dinesh-6512/Ecommerce_new`) and click **Connect**.
+3. Fill in the settings:
+   * **Name**: `ecommerce-frontend`
+   * **Branch**: `main`
+   * **Root Directory**: `frontend` (the real frontend folder)
+   * **Build Command**: `npm install && npm run build`
+   * **Publish Directory**: `dist`
+4. Scroll down to **Environment Variables** and click **Add Environment Variable**. Add:
+   * **Key**: `VITE_API_URL`
+   * **Value**: `<backend-url>/api`  
+     *(Example: `https://ecommerce-backend.onrender.com/api` — the value must end with `/api` and must NOT have a trailing `/` after it).*
+5. Click **Create Static Site** and wait until the status shows **Live**.
+6. Open the Static Site dashboard, go to the **Redirects / Rewrites** tab and click **Add Rule**:
    * **Source**: `/*`
    * **Destination**: `/index.html`
    * **Action**: `Rewrite`
+   * Click **Save Changes**. *(This prevents "Not Found" 404 errors whenever a subpage such as `/cart` or `/login` is refreshed).*
+7. Copy your live frontend URL (example: `https://ecommerce-frontend.onrender.com`).
+8. If `VITE_API_URL` is changed later, redeploy the frontend (**Manual Deploy** $\rightarrow$ **Clear build cache & deploy**), because Vite reads and embeds environment variables only during the build step.
+
+> [!TIP]
+> **Troubleshooting Node Version**: If the Render build fails with a Node version error, add the environment variable `NODE_VERSION = 22` under the **Environment** tab and redeploy.
 
 ---
 
