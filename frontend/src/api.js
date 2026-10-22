@@ -1,4 +1,9 @@
-const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const RAW_API_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.vite_api_url ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')
+    ? 'https://ecommerce-new-j82m.onrender.com/api'
+    : 'http://127.0.0.1:8000');
 const API_BASE = RAW_API_URL.endsWith('/api') ? RAW_API_URL : `${RAW_API_URL.replace(/\/+$/, '')}/api`;
 
 // Token and Session Storage Helpers
