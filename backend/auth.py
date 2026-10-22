@@ -10,8 +10,12 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from .database import get_db
-from . import models
+try:
+    from .database import get_db
+    from . import models
+except ImportError:
+    from database import get_db
+    import models
 
 # Load environment variables explicitly from backend/.env
 env_path = Path(__file__).resolve().parent / ".env"

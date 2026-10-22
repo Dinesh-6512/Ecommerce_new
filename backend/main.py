@@ -6,8 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from .database import engine, Base, get_db
-from . import models, schemas, auth
+try:
+    from .database import engine, Base, get_db, SessionLocal
+    from . import models, schemas, auth
+except ImportError:
+    from database import engine, Base, get_db, SessionLocal
+    import models, schemas, auth
 
 # Helper to seed sample data and an admin user if not already present
 def seed_initial_data(db: Session):
@@ -72,8 +76,6 @@ async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
         print("Database tables verified/created in Neon PostgreSQL.")
-
-        from .database import SessionLocal
         db = SessionLocal()
         try:
             seed_initial_data(db)

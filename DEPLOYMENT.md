@@ -1,141 +1,198 @@
-# Local Deployment Guide
+# Deployment Guide: Local & Render Cloud
 
-This document describes how to deploy, run, and test the full-stack e-commerce application on your local machine.
+This document provides complete, step-by-step instructions for deploying our full-stack e-commerce application locally and to the **Render** cloud platform.
 
 ---
 
-## 1. System Overview & Architecture
+## 1. Cloud Architecture & Deployment Order
 
-To run the application locally, you only need to run two local servers:
-1. **FastAPI Backend**: Python REST API service running on port `8000`.
-2. **ReactJS Frontend**: Single-page application running on port `3000`.
-3. **Database (Neon PostgreSQL)**: Cloud-hosted on [neon.tech](https://neon.tech).  
-   *No local PostgreSQL database server needs to be installed or run on your machine.*
+The cloud deployment consists of **three parts**, deployed in this exact sequence:
 
 ```mermaid
-graph LR
-    Browser([Browser]) -->|http://localhost:3000| Frontend[ReactJS Frontend]
-    Frontend -->|http://127.0.0.1:8000/api| Backend[FastAPI Backend]
-    Backend -->|SSL / Cloud Connection| Neon[(Neon PostgreSQL Cloud DB)]
+graph TD
+    subgraph Step 1: Database
+    A[(Neon PostgreSQL Cloud DB)]
+    end
+
+    subgraph Step 2: Backend
+    B[Render Web Service: FastAPI] -->|DATABASE_URL via SSL| A
+    end
+
+    subgraph Step 3: Frontend
+    C[Render Static Site: ReactJS] -->|VITE_API_URL| B
+    end
+
+    Browser([Customer Browser]) -->|HTTPS| C
 ```
+
+1. **Step 1: PostgreSQL Database on Neon** (Already cloud-hosted; zero server maintenance).
+2. **Step 2: FastAPI Backend on Render** (Deploys as a Python **Web Service**).
+3. **Step 3: ReactJS Frontend on Render** (Deploys as a fast, global **Static Site**).
 
 ---
 
-## 2. Required Environment Variables
+## 2. GitHub Integration & Security Verification
 
-All configuration is externalized in `.env` files. Credentials are never written directly in code.
+Before deploying to Render, the project is pushed to GitHub. Render automatically detects commits and builds the latest version.
 
-### Backend (`backend/.env`)
-| Variable | Description | Example Value |
-| :--- | :--- | :--- |
-| `DATABASE_URL` | Neon PostgreSQL connection string with `postgresql+psycopg://` dialect and SSL. | `postgresql+psycopg://user:pass@ep-xyz.region.aws.neon.tech/neondb?sslmode=require` |
-| `SECRET_KEY` | 32-byte secret hexadecimal key for signing and verifying JWT tokens. | `03e92f96768449873ddd53d5752c722c922cba39893ab8d6e35fe69ab897ab2d` |
-| `ALGORITHM` | Algorithm used for JWT encoding. | `HS256` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiration duration in minutes. | `1440` (24 hours) |
+### 1. Main `.gitignore` Protection
+The project includes a root [.gitignore](file:///c:/Users/dines/Documents/Ecommerce_new/.gitignore) ensuring secrets and local artifacts are never committed:
+* `.env`, `backend/.env`, `frontend/.env`, `*.env` (Hides all passwords and secret keys)
+* `venv/`, `.venv/` (Hides local Python virtual environments)
+* `__pycache__/`, `*.pyc` (Hides Python bytecode cache)
+* `node_modules/` (Hides downloaded npm packages)
+* `dist/` (Hides compiled production builds)
 
-### Frontend (`frontend/.env`)
-| Variable | Description | Example Value |
-| :--- | :--- | :--- |
-| `VITE_API_URL` | The base URL of the FastAPI backend. Used by React's API client. | `http://127.0.0.1:8000` |
-
----
-
-## 3. Files That Must NEVER Be Uploaded to GitHub
-
-The following files and folders contain sensitive credentials or build artifacts and are protected by [.gitignore](file:///c:/Users/dines/Documents/Ecommerce_new/.gitignore):
-* `backend/.env` (Contains your database password and JWT secret key)
-* `frontend/.env` (Contains local environment variables)
-* `backend/.venv/` (Local Python virtual environment)
-* `frontend/node_modules/` (Downloaded npm packages)
-* `frontend/dist/` (Production build output)
-* `__pycache__/` and `*.pyc` (Python bytecode files)
-
----
-
-## 4. Backend Setup & Run Instructions
-
-From the project root directory (`Ecommerce_new/`):
-
-### Install Dependencies:
-```powershell
-# 1. Create Python virtual environment inside backend folder
-python -m venv backend\.venv
-
-# 2. Install required backend packages
-.\backend\.venv\Scripts\python -m pip install -r backend\requirements.txt
-```
-
-### Start the Backend Server:
-```powershell
-.\backend\.venv\Scripts\uvicorn backend.main:app --port 8000 --reload
-```
-* **Local Backend URL**: `http://127.0.0.1:8000`
-* **Swagger API Documentation**: `http://127.0.0.1:8000/docs`
-* **Health Check URL**: `http://127.0.0.1:8000/api/health`
-
-### Restart the Backend:
-Press `CTRL + C` in the backend terminal window to stop the server, then run the start command again.
-
----
-
-## 5. Frontend Setup & Run Instructions
-
-From the project root directory (`Ecommerce_new/`):
-
-### Install Dependencies:
-```powershell
-cd frontend
-npm install
-cd ..
-```
-
-### Start the Development Server:
-```powershell
-cd frontend
-npm run dev
-```
-* **Local Frontend URL**: `http://localhost:3000`
-
-### Build Production Bundle:
-To test or verify the production bundle:
-```powershell
-cd frontend
-npm run build
-```
-*(Produces minified and bundled static assets in `frontend/dist/`)*.
-
----
-
-## 6. How to Verify Everything is Working
-
-1. **Verify Backend Health**:
-   Open a browser or run PowerShell:
+### 2. Pushing the Project to GitHub
+1. Go to [github.com](https://github.com) and click **"New repository"**.
+2. Name it (for example: `ecommerce-app`), select **Public** or **Private**, and click **"Create repository"** (do NOT initialize with README).
+3. In your local terminal, link and push your code:
    ```powershell
-   Invoke-RestMethod -Uri http://127.0.0.1:8000/api/health
-   ```
-   **Expected Response**:
-   ```json
-   {
-     "status": "healthy",
-     "database": "connected to Neon PostgreSQL",
-     "tables": ["users", "products", "cart", "cart_items"]
-   }
+   git remote add origin https://github.com/<your-username>/ecommerce-app.git
+   git branch -M main
+   git push -u origin main
    ```
 
-2. **Verify API Documentation**:
-   Visit `http://127.0.0.1:8000/docs` in your browser. All authentication, product, and cart endpoints will be visible.
-
-3. **Verify Frontend Storefront**:
-   Visit `http://localhost:3000` in your browser. The live product catalog fetched from Neon PostgreSQL will appear on screen.
+### 3. Verify No Secrets on GitHub
+Visit your GitHub repository in your browser:
+* Confirm `backend/.env` is **NOT** present in the file tree.
+* Confirm `frontend/.env` is **NOT** present in the file tree.
+* Confirm no passwords, database links, or secret keys appear in any committed file.
 
 ---
 
-## 7. End-to-End User Verification Workflow
+## 3. Neon PostgreSQL Database Integration
 
-Test the complete flow in the browser or via API:
-1. **Register**: Go to `/register` and create an account with email and password.
-2. **Login**: Go to `/login` and sign in. Confirm your email appears in the header.
-3. **View Products**: On `/`, browse the live items.
-4. **Add Product (as Admin)**: Log in with `admin@store.com` / `AdminPass123!`, go to `/add-product`, and submit a new product. Verify it appears on the home page.
-5. **Add to Cart**: Click "+ Add to Cart" on any product card.
-6. **View Cart**: Go to `/cart`. Verify the selected items, quantities, and calculated total match.
+### 1. Create Neon Project & Database
+1. Go to [neon.tech](https://neon.tech) and log in.
+2. Click **"Create Project"**:
+   * **Project Name**: `ecommerce-db`
+   * **Region**: Select the region closest to you (e.g., AWS US East, Singapore, or Frankfurt).
+   * Click **"Create"**.
+
+### 2. Copy the Connection String
+1. On your Neon project dashboard, click the **Connect** button at the top.
+2. Set **Connection pooling** to **ON** (recommended for scalable web apps).
+3. Copy the pooled connection string.
+
+### 3. Change Prefix for psycopg (v3) Driver
+Neon provides a connection string starting with `postgresql://`. Because our [backend/requirements.txt](file:///c:/Users/dines/Documents/Ecommerce_new/backend/requirements.txt) uses the high-performance modern **`psycopg` (version 3)** driver, update the beginning of the URL:
+* **Original Neon Link**:
+  ```text
+  postgresql://user:password@ep-xyz-pooler.region.aws.neon.tech/neondb?sslmode=require
+  ```
+* **Required SQLAlchemy Format**:
+  ```text
+  postgresql+psycopg://user:password@ep-xyz-pooler.region.aws.neon.tech/neondb?sslmode=require
+  ```
+*(Ensure `?sslmode=require` remains at the end).*
+
+### 4. Local Testing with Neon
+Add the connection string to `backend/.env`:
+```env
+DATABASE_URL=postgresql+psycopg://user:password@ep-xyz-pooler.region.aws.neon.tech/neondb?sslmode=require
+```
+When FastAPI starts, it connects over SSL, creates all 4 tables (`users`, `products`, `cart`, `cart_items`), and seeds sample products. The health check confirms this:
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8000/api/health
+```
+
+---
+
+## 4. Render Deployment Settings
+
+### Part 2: FastAPI Backend (Render Web Service)
+In the Render dashboard, click **New +** $\rightarrow$ **Web Service**:
+
+| Setting | Value | Why It Is Used |
+| :--- | :--- | :--- |
+| **Name** | `ecommerce-backend` | Name of your backend service. |
+| **Language** | `Python` | Runtime environment. |
+| **Root Directory** | `backend` | Tells Render to run commands inside the `backend/` folder. |
+| **Build Command** | `pip install -r requirements.txt` | Installs FastAPI, SQLAlchemy, psycopg, pyjwt, bcrypt. |
+| **Start Command** | `uvicorn main:app --host 0.0.0.0 --port $PORT` | Starts the production ASGI server on the port assigned by Render. |
+| **Instance Type** | `Free` | Free tier web service. |
+
+> [!NOTE]
+> Once deployed, Render provides a public HTTPS URL (e.g., `https://ecommerce-backend.onrender.com`).  
+> Verify it by visiting `https://ecommerce-backend.onrender.com/api/health`.
+
+---
+
+### Part 3: ReactJS Frontend (Render Static Site)
+In the Render dashboard, click **New +** $\rightarrow$ **Static Site**:
+
+| Setting | Value | Why It Is Used |
+| :--- | :--- | :--- |
+| **Name** | `ecommerce-frontend` | Name of your storefront website. |
+| **Root Directory** | `frontend` | Tells Render to run commands inside the `frontend/` folder. |
+| **Build Command** | `npm install && npm run build` | Downloads packages and bundles production static assets. |
+| **Publish Directory** | `dist` | The folder where Vite places the compiled HTML, CSS, and JS files. |
+
+#### Crucial: Rewrite Rule for React Router (Single Page Application)
+Because React Router manages page navigation client-side, any direct visit to `/login`, `/cart`, or `/add-product` must return `index.html`:
+1. In your Render Static Site dashboard, go to the **Redirects / Rewrites** tab.
+2. Click **Add Rule**:
+   * **Source**: `/*`
+   * **Destination**: `/index.html`
+   * **Action**: `Rewrite`
+
+---
+
+## 5. Environment Variables Table
+
+Set these in the **Environment** tab on Render. Only variable names are shown (never real secrets in documentation):
+
+### Backend Environment Variables (Render Web Service)
+| Variable Name | Required Value Description |
+| :--- | :--- |
+| `DATABASE_URL` | Your Neon connection string with `postgresql+psycopg://` and `?sslmode=require`. |
+| `SECRET_KEY` | 32-byte secret hex key generated using `secrets.token_hex(32)`. |
+| `ALGORITHM` | `HS256` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `1440` (24 hours) |
+
+### Frontend Environment Variables (Render Static Site)
+| Variable Name | Required Value Description |
+| :--- | :--- |
+| `VITE_API_URL` | The live URL of your deployed Render backend (e.g., `https://ecommerce-backend.onrender.com`). |
+
+---
+
+## 6. How the First Admin User is Created
+
+When the backend starts up on Render for the very first time:
+1. FastAPI's lifespan startup handler automatically checks the `users` table in Neon.
+2. If no admin exists, it automatically creates the default administrator account:
+   * **Email**: `admin@store.com`
+   * **Password**: `AdminPass123!`
+   * **Role**: `is_admin = True`
+3. The admin can immediately log in from the frontend at `/login` to access the protected **Add Product** screen and publish items.
+
+---
+
+## 7. Exact Deployment Steps in Order
+
+When ready to deploy online:
+
+1. **Step 1: Push Code to GitHub**
+   * Stage and push all project files. Confirm `.env` files are not on GitHub.
+2. **Step 2: Neon Cloud Database**
+   * Confirm your Neon project exists and copy the pooled connection string.
+3. **Step 3: Deploy Backend on Render**
+   * Create **Web Service** pointing to your GitHub repository.
+   * Set Root Directory to `backend`.
+   * Set Build Command to `pip install -r requirements.txt`.
+   * Set Start Command to `uvicorn main:app --host 0.0.0.0 --port $PORT`.
+   * Add Environment Variables: `DATABASE_URL` and `SECRET_KEY`.
+   * Wait for deployment to finish and copy your live backend URL (`https://...onrender.com`).
+   * Test `https://<backend-url>/api/health` $\rightarrow$ should return `"status": "healthy"`.
+4. **Step 4: Deploy Frontend on Render**
+   * Create **Static Site** pointing to your GitHub repository.
+   * Set Root Directory to `frontend`.
+   * Set Build Command to `npm install && npm run build`.
+   * Set Publish Directory to `dist`.
+   * Add Environment Variable: `VITE_API_URL = https://<your-backend-url>`.
+   * Add Rewrite Rule: `/*` $\rightarrow$ `/index.html` (Rewrite).
+5. **Step 5: Verify Live Application**
+   * Open the live frontend URL in your browser.
+   * Test user flow: Register new customer $\rightarrow$ Login $\rightarrow$ View products $\rightarrow$ Log in as admin $\rightarrow$ Add product $\rightarrow$ Add to cart $\rightarrow$ View cart.
